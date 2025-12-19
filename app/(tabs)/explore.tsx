@@ -1,112 +1,147 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Collapsible } from '@/components/ui/collapsible';
-import { ExternalLink } from '@/components/external-link';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Fonts } from '@/constants/theme';
+import { useTheme } from '@/contexts/theme-context';
+import { Spacing, BorderRadius } from '@/constants';
 
-export default function TabTwoScreen() {
+export default function ExploreScreen() {
+  const { colors, shadows } = useTheme();
+  const insets = useSafeAreaInsets();
+
+  const adventures = [
+    { id: 1, name: 'Garibaldi Lake Trail', location: 'Squamish', difficulty: 'Moderate' },
+    { id: 2, name: 'Joffre Lakes', location: 'Pemberton', difficulty: 'Easy' },
+    { id: 3, name: 'Grouse Grind', location: 'North Vancouver', difficulty: 'Hard' },
+    { id: 4, name: 'Stawamus Chief', location: 'Squamish', difficulty: 'Moderate' },
+  ];
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText
-          type="title"
-          style={{
-            fontFamily: Fonts.rounded,
-          }}>
-          Explore
-        </ThemedText>
-      </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image
-          source={require('@/assets/images/react-logo.png')}
-          style={{ width: 100, height: 100, alignSelf: 'center' }}
-        />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful{' '}
-          <ThemedText type="defaultSemiBold" style={{ fontFamily: Fonts.mono }}>
-            react-native-reanimated
-          </ThemedText>{' '}
-          library to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
-            </ThemedText>
-          ),
-        })}
-      </Collapsible>
-    </ParallaxScrollView>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingTop: insets.top + Spacing.lg,
+            paddingBottom: Platform.OS === 'ios' ? 100 : insets.bottom + Spacing.lg,
+          },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={[styles.title, { color: colors.textPrimary }]}>Explore</Text>
+        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+          Discover BC Parks adventures
+        </Text>
+
+        <View style={styles.grid}>
+          {adventures.map((adventure) => (
+            <View
+              key={adventure.id}
+              style={[
+                styles.card,
+                { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder },
+                shadows.md,
+              ]}
+            >
+              <View style={[styles.imagePlaceholder, { backgroundColor: colors.glassBg }]} />
+              <View style={styles.cardContent}>
+                <Text style={[styles.cardTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                  {adventure.name}
+                </Text>
+                <Text style={[styles.cardLocation, { color: colors.textSecondary }]}>
+                  {adventure.location}
+                </Text>
+                <View
+                  style={[
+                    styles.difficultyBadge,
+                    {
+                      backgroundColor:
+                        adventure.difficulty === 'Hard'
+                          ? colors.danger + '20'
+                          : adventure.difficulty === 'Moderate'
+                            ? colors.highlight + '20'
+                            : colors.accent + '20',
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.difficultyText,
+                      {
+                        color:
+                          adventure.difficulty === 'Hard'
+                            ? colors.danger
+                            : adventure.difficulty === 'Moderate'
+                              ? colors.highlight
+                              : colors.accent,
+                      },
+                    ]}
+                  >
+                    {adventure.difficulty}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          ))}
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
+  container: {
+    flex: 1,
   },
-  titleContainer: {
+  scrollView: {
+    flex: 1,
+  },
+  content: {
+    paddingHorizontal: Spacing.lg,
+    gap: Spacing.lg,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+  },
+  subtitle: {
+    fontSize: 15,
+    marginTop: -8,
+  },
+  grid: {
     flexDirection: 'row',
-    gap: 8,
+    flexWrap: 'wrap',
+    gap: Spacing.md,
+  },
+  card: {
+    width: '48%',
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  imagePlaceholder: {
+    height: 120,
+  },
+  cardContent: {
+    padding: Spacing.md,
+    gap: 4,
+  },
+  cardTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  cardLocation: {
+    fontSize: 13,
+  },
+  difficultyBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.sm,
+    marginTop: Spacing.xs,
+  },
+  difficultyText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
 });

@@ -1,272 +1,436 @@
-# Trailblazer+ React Native: Implementation Plan
+# Trailblazer+ React Native: Phase 3 & 4 Implementation Plan
+
+## Overview
+
+Implementing navigation architecture and centralized theme system following React Native best practices.
 
 ---
 
-## Phase 1: Uniwind Setup (Do First)
-
-Uniwind provides Tailwind CSS v4 bindings for React Native - required by HeroUI Native.
-
-### Step 1.1: Install Uniwind
-
-```bash
-npm install uniwind tailwindcss
-```
-
-### Step 1.2: Create global.css
-
-Create `global.css` in project root:
-
-```css
-@import 'tailwindcss';
-@import 'uniwind';
-```
-
-### Step 1.3: Configure Metro
-
-Create/update `metro.config.js`:
-
-```javascript
-const { getDefaultConfig } = require('expo/metro-config');
-const { withUniwindConfig } = require('uniwind/metro');
-
-const config = getDefaultConfig(__dirname);
-
-// IMPORTANT: withUniwindConfig must be the outermost wrapper
-module.exports = withUniwindConfig(config, {
-  cssEntryFile: './global.css',
-  dtsFile: './uniwind-types.d.ts',
-});
-```
-
-### Step 1.4: Import in Root Layout
-
-Update `app/_layout.tsx`:
-
-```tsx
-import '../global.css';
-// ... rest of layout
-```
-
-### Step 1.5: Generate Types
-
-Run `npx expo start` once to generate `uniwind-types.d.ts` for TypeScript support.
-
-### Files to modify:
-- `metro.config.js` (create/update)
-- `global.css` (create)
-- `app/_layout.tsx` (add import)
-
----
-
-## Phase 2: HeroUI Native Setup (Do Second)
-
-### Step 2.1: Install HeroUI Native + Missing Peer Dependencies
-
-Already installed (from Expo template):
-- ✅ react-native-screens@~4.16.0
-- ✅ react-native-reanimated@~4.1.1
-- ✅ react-native-gesture-handler@~2.28.0
-- ✅ react-native-safe-area-context@~5.6.0
-- ✅ react-native-worklets@0.5.1
-
-Need to install:
-
-```bash
-npm install heroui-native react-native-svg@^15.12.1 @gorhom/bottom-sheet@^5 tailwind-variants@^3.1.0 tailwind-merge@^3.3.1
-```
-
-Optional (recommended for better keyboard handling):
-
-```bash
-npm install react-native-keyboard-controller
-```
-
-### Step 2.2: Update global.css
-
-Add HeroUI Native styles:
-
-```css
-@import 'tailwindcss';
-@import 'uniwind';
-@import 'heroui-native/styles';
-
-@source './node_modules/heroui-native/lib';
-```
-
-### Step 2.3: Configure Provider Hierarchy
-
-Update `app/_layout.tsx`:
-
-```tsx
-import '../global.css';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { HeroUINativeProvider } from 'heroui-native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet } from 'react-native';
-
-export default function RootLayout() {
-  return (
-    <GestureHandlerRootView style={styles.root}>
-      <HeroUINativeProvider>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="(modals)" options={{ headerShown: false }} />
-        </Stack>
-        <StatusBar style="auto" />
-      </HeroUINativeProvider>
-    </GestureHandlerRootView>
-  );
-}
-
-const styles = StyleSheet.create({
-  root: { flex: 1 },
-});
-```
-
-### Step 2.4: Verify Setup
-
-Create a test component using HeroUI Native:
-
-```tsx
-import { Button } from 'heroui-native';
-import { View } from 'react-native';
-
-export default function TestScreen() {
-  return (
-    <View className="flex-1 justify-center items-center bg-background">
-      <Button onPress={() => console.log('Works!')}>
-        HeroUI Native Works
-      </Button>
-    </View>
-  );
-}
-```
-
-### Files to modify:
-- `package.json` (dependencies)
-- `global.css` (add heroui imports)
-- `app/_layout.tsx` (provider setup)
-
-### Available HeroUI Native Components:
-- **Form:** Button, TextField, Select, Checkbox, Radio, Switch, Form Field
-- **Display:** Avatar, Chip, Skeleton, Spinner, Card, Divider
-- **Overlay:** Dialog, Popover, Toast, Bottom Sheet
-- **Layout:** Accordion, Tabs, Surface, Scroll Shadow
-
----
-
-## Phase 3: Navigation Architecture (Expo Router)
-
-### Decision: Keep Expo Router
-
-Already configured. File-based routing with typed routes enabled.
+## Phase 3: Navigation Architecture
 
 ### Route Structure
 
 ```
 app/
-├── _layout.tsx              # Root (GestureHandler + HeroUI Provider)
+├── _layout.tsx              # Root (providers + modal config)
 ├── (tabs)/
-│   ├── _layout.tsx          # Bottom tabs
+│   ├── _layout.tsx          # Tab navigator with themed tab bar
 │   ├── index.tsx            # Home
 │   ├── explore.tsx          # Adventures
 │   ├── rewards.tsx          # Rewards
 │   └── profile.tsx          # Profile
 ├── (modals)/
-│   ├── _layout.tsx          # Modal stack (presentation: 'modal')
-│   ├── log-activity.tsx
-│   ├── activity/[id].tsx
-│   ├── reward/[id].tsx
-│   ├── notifications.tsx
-│   ├── upgrade.tsx
-│   ├── badge/[id].tsx
-│   ├── reset-challenge.tsx
-│   └── giveaway.tsx
-├── chat.tsx                 # Full-screen Parker AI
-└── login.tsx                # Auth flow
+│   ├── _layout.tsx          # Modal stack (transparentModal)
+│   ├── log-activity.tsx     # Bottom sheet
+│   ├── activity-detail.tsx  # Bottom sheet
+│   ├── reward-detail.tsx    # Bottom sheet
+│   ├── notifications.tsx    # Form sheet
+│   ├── upgrade.tsx          # Center card
+│   ├── badge-detail.tsx     # Bottom sheet
+│   ├── reset-challenge.tsx  # Center card
+│   └── giveaway.tsx         # Bottom sheet
+├── chat.tsx                 # Full-screen (Parker AI)
+└── login.tsx                # Full-screen (Auth)
 ```
 
-### Route-Based Modals Pattern
+### Modal Presentation Strategy
+
+| Modal | Presentation | Reason |
+|-------|--------------|--------|
+| log-activity | `@gorhom/bottom-sheet` | Quick action, 85% height |
+| activity-detail | `@gorhom/bottom-sheet` | Detail view |
+| reward-detail | `@gorhom/bottom-sheet` | Detail view |
+| notifications | `formSheet` | List view |
+| upgrade | `transparentModal` + center card | Important decision |
+| badge-detail | `@gorhom/bottom-sheet` | Detail view |
+| reset-challenge | `transparentModal` + center card | Confirmation |
+| giveaway | `@gorhom/bottom-sheet` | Quick action |
+| chat | `fullScreenModal` | Immersive |
+| login | `fullScreenModal` | Auth flow |
+
+### Root Layout (`app/_layout.tsx`)
 
 ```tsx
-// app/(modals)/_layout.tsx
 import { Stack } from 'expo-router';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
+import { HeroUINativeProvider } from 'heroui-native';
+import { ThemeProvider } from '@/contexts/theme-context';
+import { StatusBar } from 'expo-status-bar';
+import '../global.css';
 
-export default function ModalsLayout() {
+export default function RootLayout() {
   return (
-    <Stack screenOptions={{ presentation: 'modal' }}>
-      <Stack.Screen name="log-activity" options={{ title: 'Log Activity' }} />
-      <Stack.Screen name="reward/[id]" options={{ title: 'Reward' }} />
-      {/* ... */}
-    </Stack>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <HeroUINativeProvider>
+        <ThemeProvider>
+          <BottomSheetModalProvider>
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen
+                name="(modals)"
+                options={{
+                  presentation: 'transparentModal',
+                  animation: 'fade',
+                }}
+              />
+              <Stack.Screen
+                name="chat"
+                options={{
+                  presentation: 'fullScreenModal',
+                  animation: 'slide_from_bottom',
+                }}
+              />
+              <Stack.Screen
+                name="login"
+                options={{ presentation: 'fullScreenModal' }}
+              />
+            </Stack>
+            <StatusBar style="auto" />
+          </BottomSheetModalProvider>
+        </ThemeProvider>
+      </HeroUINativeProvider>
+    </GestureHandlerRootView>
   );
 }
 ```
 
-Opening modals:
+### Tab Layout (`app/(tabs)/_layout.tsx`)
+
 ```tsx
-import { router } from 'expo-router';
-router.push('/(modals)/log-activity');
+import { Tabs } from 'expo-router';
+import { Platform } from 'react-native';
+import { BlurView } from 'expo-blur';
+import { useTheme } from '@/contexts/theme-context';
+import { Home, Compass, Gift, User } from 'lucide-react-native';
+
+export default function TabLayout() {
+  const { colors, isDark } = useTheme();
+
+  return (
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.tabIconInactive,
+        tabBarStyle: {
+          backgroundColor: colors.tabBarBackground,
+          borderTopColor: colors.tabBarBorder,
+          borderTopWidth: 1,
+          height: Platform.OS === 'ios' ? 88 : 64,
+          paddingTop: 8,
+          paddingBottom: Platform.OS === 'ios' ? 28 : 8,
+        },
+        tabBarBackground: () =>
+          Platform.OS === 'ios' ? (
+            <BlurView intensity={isDark ? 80 : 60} style={{ flex: 1 }} />
+          ) : null,
+      }}
+    >
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Home',
+          tabBarIcon: ({ color, size }) => <Home size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="explore"
+        options={{
+          title: 'Explore',
+          tabBarIcon: ({ color, size }) => <Compass size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="rewards"
+        options={{
+          title: 'Rewards',
+          tabBarIcon: ({ color, size }) => <Gift size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color, size }) => <User size={size} color={color} />,
+        }}
+      />
+    </Tabs>
+  );
+}
 ```
 
 ---
 
-## Phase 4: Theme & Design System
+## Phase 4: Theme System
 
-### Translate PWA Theme to HeroUI Native
+### File Structure
 
-The PWA uses CSS variables. HeroUI Native uses Tailwind + CSS variables via Uniwind.
+```
+constants/
+├── colors.ts       # Color tokens (light/dark)
+├── spacing.ts      # Spacing scale
+├── typography.ts   # Font definitions
+├── shadows.ts      # Platform-specific shadows
+├── gradients.ts    # LinearGradient configs
+└── index.ts        # Re-exports
 
-Map PWA colors to Tailwind config or CSS variables in `global.css`:
+contexts/
+└── theme-context.tsx   # ThemeProvider + useTheme hook
+```
 
-```css
-@import 'tailwindcss';
-@import 'uniwind';
-@import 'heroui-native/styles';
+### Color Tokens (`constants/colors.ts`)
 
-@source './node_modules/heroui-native/lib';
+```typescript
+export const Colors = {
+  light: {
+    background: '#F2F2F7',
+    backgroundSecondary: '#FFFFFF',
+    glassBg: 'rgba(255, 255, 255, 0.8)',
+    glassBorder: 'rgba(0, 0, 0, 0.06)',
+    textPrimary: '#1C1C1E',
+    textSecondary: '#8E8E93',
+    primary: '#007AFF',
+    accent: '#34C759',
+    highlight: '#FF9500',
+    purple: '#BF5AF2',
+    tabBarBackground: '#FFFFFF',
+    tabBarBorder: 'rgba(0, 0, 0, 0.08)',
+    tabIconActive: '#007AFF',
+    tabIconInactive: '#8E8E93',
+    cardBackground: '#FFFFFF',
+    cardBorder: 'rgba(0, 0, 0, 0.06)',
+    progressTrack: 'rgba(0, 0, 0, 0.1)',
+  },
+  dark: {
+    background: '#050505',
+    backgroundSecondary: '#1C1C1E',
+    glassBg: 'rgba(255, 255, 255, 0.08)',
+    glassBorder: 'rgba(255, 255, 255, 0.1)',
+    textPrimary: '#FFFFFF',
+    textSecondary: '#A1A1AA',
+    primary: '#00F2FF',
+    accent: '#2AFF5D',
+    highlight: '#FFAA00',
+    purple: '#BF5AF2',
+    tabBarBackground: '#1A1A1F',
+    tabBarBorder: 'rgba(255, 255, 255, 0.08)',
+    tabIconActive: '#00F2FF',
+    tabIconInactive: '#6B6B70',
+    cardBackground: 'rgba(255, 255, 255, 0.08)',
+    cardBorder: 'rgba(255, 255, 255, 0.1)',
+    progressTrack: 'rgba(255, 255, 255, 0.1)',
+  },
+} as const;
 
-/* Custom theme colors (matching PWA) */
-:root {
-  --color-primary: #00f2ff;
-  --color-accent: #2aff5d;
-  --color-highlight: #ffaa00;
-  --color-purple: #bf5af2;
+export type ColorScheme = keyof typeof Colors;
+export type ColorTokens = typeof Colors.light;
+```
+
+### Spacing (`constants/spacing.ts`)
+
+```typescript
+export const Spacing = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 24,
+  '2xl': 32,
+  '3xl': 40,
+  '4xl': 48,
+} as const;
+
+export const BorderRadius = {
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  '2xl': 24,
+  '3xl': 30,
+  full: 9999,
+} as const;
+```
+
+### Shadows (`constants/shadows.ts`)
+
+```typescript
+import { Platform, ViewStyle } from 'react-native';
+
+type ShadowStyle = Pick<ViewStyle, 'shadowColor' | 'shadowOffset' | 'shadowOpacity' | 'shadowRadius' | 'elevation'>;
+
+const createShadow = (opacity: number, radius: number, elevation: number): ShadowStyle =>
+  Platform.select({
+    ios: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: radius / 2 },
+      shadowOpacity: opacity,
+      shadowRadius: radius,
+    },
+    android: { elevation },
+    default: {},
+  }) as ShadowStyle;
+
+export const Shadows = {
+  light: {
+    sm: createShadow(0.08, 4, 2),
+    md: createShadow(0.12, 8, 4),
+    lg: createShadow(0.16, 16, 8),
+  },
+  dark: {
+    sm: createShadow(0.5, 4, 2),
+    md: createShadow(0.6, 8, 4),
+    lg: createShadow(0.7, 16, 8),
+  },
+} as const;
+```
+
+### Gradients (`constants/gradients.ts`)
+
+```typescript
+export const Gradients = {
+  light: {
+    primary: { colors: ['#007AFF', '#0055FF'] as const },
+    accent: { colors: ['#34C759', '#248A3D'] as const },
+    gold: { colors: ['#FFD700', '#FDB931', '#E6AC00'] as const },
+  },
+  dark: {
+    primary: { colors: ['#00F2FF', '#0066FF'] as const },
+    accent: { colors: ['#2AFF5D', '#00CC44'] as const },
+    ai: { colors: ['#FF0080', '#7928CA'] as const },
+    gold: { colors: ['#FFD700', '#FDB931', '#E6AC00'] as const },
+  },
+} as const;
+```
+
+### Theme Context (`contexts/theme-context.tsx`)
+
+```typescript
+import { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
+import { useColorScheme as useSystemColorScheme } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Colors, ColorScheme, ColorTokens } from '@/constants/colors';
+import { Shadows } from '@/constants/shadows';
+import { Gradients } from '@/constants/gradients';
+
+interface ThemeContextValue {
+  colorScheme: ColorScheme;
+  setColorScheme: (scheme: ColorScheme) => void;
+  toggleColorScheme: () => void;
+  isDark: boolean;
+  colors: ColorTokens;
+  shadows: typeof Shadows.light;
+  gradients: typeof Gradients.light | typeof Gradients.dark;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-background: #050505;
-    --color-foreground: #ffffff;
-  }
+const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
+
+const STORAGE_KEY = '@trailblazer_theme';
+
+export function ThemeProvider({ children }: { children: ReactNode }) {
+  const systemScheme = useSystemColorScheme();
+  const [colorScheme, setColorSchemeState] = useState<ColorScheme>('dark');
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem(STORAGE_KEY).then((saved) => {
+      if (saved === 'light' || saved === 'dark') {
+        setColorSchemeState(saved);
+      } else if (systemScheme) {
+        setColorSchemeState(systemScheme);
+      }
+      setIsLoaded(true);
+    });
+  }, [systemScheme]);
+
+  const setColorScheme = (scheme: ColorScheme) => {
+    setColorSchemeState(scheme);
+    AsyncStorage.setItem(STORAGE_KEY, scheme);
+  };
+
+  const toggleColorScheme = () => {
+    setColorScheme(colorScheme === 'dark' ? 'light' : 'dark');
+  };
+
+  const value = useMemo(() => ({
+    colorScheme,
+    setColorScheme,
+    toggleColorScheme,
+    isDark: colorScheme === 'dark',
+    colors: Colors[colorScheme],
+    shadows: Shadows[colorScheme],
+    gradients: Gradients[colorScheme],
+  }), [colorScheme]);
+
+  if (!isLoaded) return null;
+
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    --color-background: #f2f2f7;
-    --color-foreground: #1c1c1e;
-  }
+export function useTheme() {
+  const context = useContext(ThemeContext);
+  if (!context) throw new Error('useTheme must be used within ThemeProvider');
+  return context;
 }
 ```
 
 ---
 
-## Summary: Implementation Order
+## Implementation Steps
 
-1. **Uniwind** - Install, configure metro, create global.css
-2. **HeroUI Native** - Install, add to global.css, set up providers
-3. **Navigation** - Restructure app/ with (tabs) and (modals) groups
-4. **Theme** - Port PWA design tokens to Uniwind/HeroUI
-5. **Components** - Build screens using HeroUI Native components
-6. **Firebase** - Set up auth and Firestore contexts
-7. **Features** - Port activity tracking, Parker AI, rewards
+### Step 1: Install Additional Dependencies
+```bash
+npm install @react-native-async-storage/async-storage expo-blur lucide-react-native
+```
+
+### Step 2: Create Theme Constants
+- `constants/colors.ts`
+- `constants/spacing.ts`
+- `constants/shadows.ts`
+- `constants/gradients.ts`
+- `constants/index.ts`
+
+### Step 3: Create Theme Context
+- `contexts/theme-context.tsx`
+
+### Step 4: Update Root Layout
+- Add `ThemeProvider` and `BottomSheetModalProvider`
+- Configure modal stack screens
+
+### Step 5: Create Tab Navigation
+- `app/(tabs)/_layout.tsx` with themed tab bar
+- Placeholder screens for each tab
+
+### Step 6: Create Modal Routes
+- `app/(modals)/_layout.tsx`
+- Placeholder screens for each modal
+
+### Step 7: Create Full-Screen Routes
+- `app/chat.tsx` placeholder
+- `app/login.tsx` placeholder
 
 ---
 
-## Resources
+## Files to Create/Modify
 
-- [Uniwind Docs](https://docs.uniwind.dev/quickstart)
-- [HeroUI Native GitHub](https://github.com/heroui-inc/heroui-native)
-- [HeroUI Native Example](https://github.com/heroui-inc/heroui-native-example)
-- [Expo Router Docs](https://docs.expo.dev/router/introduction/)
+**Create:**
+- `constants/colors.ts`
+- `constants/spacing.ts`
+- `constants/shadows.ts`
+- `constants/gradients.ts`
+- `constants/index.ts`
+- `contexts/theme-context.tsx`
+- `app/(tabs)/_layout.tsx`
+- `app/(tabs)/index.tsx`
+- `app/(tabs)/explore.tsx`
+- `app/(tabs)/rewards.tsx`
+- `app/(tabs)/profile.tsx`
+- `app/(modals)/_layout.tsx`
+- `app/(modals)/log-activity.tsx`
+- `app/(modals)/upgrade.tsx`
+- `app/chat.tsx`
+- `app/login.tsx`
+
+**Modify:**
+- `app/_layout.tsx` (add providers)
+- `package.json` (new deps)
