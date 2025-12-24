@@ -81,6 +81,10 @@ Available: Button, TextField, Select, Checkbox, Radio, Switch, Avatar, Chip, Ske
 
 Import from: `import { Button, Card } from 'heroui-native'`
 
+## Document updates
+
+Anytime you update a folder (like components, db, functions, lib, etc.) make sure to update the `CLAUDE.md` file within that folder so that all subsequent Claude code sessions has the most up-to-date context on what is going on with the app.
+
 ## Anti-Patterns to Avoid
 
 - Don't use `any` type

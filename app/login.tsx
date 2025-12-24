@@ -1,19 +1,52 @@
 import { useState } from "react";
 
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { LinearGradient } from "expo-linear-gradient";
-import { Stack, router } from "expo-router";
+import { Stack } from "expo-router";
+
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  AuthError,
+} from "firebase/auth";
 
 import { Button } from "heroui-native";
 
-import { ArrowLeft, Eye, EyeOff, Lock, Mail } from "lucide-react-native";
+import { Eye, EyeOff, Lock, Mail } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { BorderRadius, Spacing } from "@/constants";
 import { useTheme } from "@/contexts/theme-context";
+import { auth } from "@/lib/firebase";
+import { createUser } from "@/lib/db/users";
 
 type AuthMode = "login" | "signup";
+
+function getFirebaseErrorMessage(error: AuthError): string {
+  switch (error.code) {
+    case "auth/invalid-email":
+      return "Invalid email address";
+    case "auth/user-disabled":
+      return "This account has been disabled";
+    case "auth/user-not-found":
+      return "No account found with this email";
+    case "auth/wrong-password":
+      return "Incorrect password";
+    case "auth/invalid-credential":
+      return "Invalid email or password";
+    case "auth/email-already-in-use":
+      return "Email already registered";
+    case "auth/weak-password":
+      return "Password must be at least 6 characters";
+    case "auth/too-many-requests":
+      return "Too many attempts. Please try again later";
+    case "auth/network-request-failed":
+      return "Network error. Please check your connection";
+    default:
+      return error.message || "Authentication failed";
+  }
+}
 
 export default function LoginScreen() {
   const { colors, gradients, shadows } = useTheme();
@@ -22,10 +55,44 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleAuth = () => {
-    // Auth logic will be implemented with Firebase
-    router.replace("/(tabs)");
+  const handleAuth = async () => {
+    if (!email.trim() || !password) {
+      setError("Please fill in all fields");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      if (mode === "signup") {
+        console.log("[Auth] Creating Firebase user...");
+        const { user } = await createUserWithEmailAndPassword(auth, email.trim(), password);
+        console.log("[Auth] Firebase user created:", user.uid);
+        await createUser(user.uid, {
+          email: user.email || email.trim(),
+          displayName: null,
+          photoURL: null,
+        });
+        console.log("[Auth] Firestore user document created");
+      } else {
+        console.log("[Auth] Signing in...");
+        await signInWithEmailAndPassword(auth, email.trim(), password);
+        console.log("[Auth] Sign in successful");
+      }
+    } catch (err) {
+      console.error("[Auth] Error:", err);
+      if (err && typeof err === "object" && "code" in err) {
+        setError(getFirebaseErrorMessage(err as AuthError));
+      } else {
+        setError(err instanceof Error ? err.message : "An error occurred");
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const toggleMode = () => {
@@ -47,10 +114,7 @@ export default function LoginScreen() {
           end={gradients.primary.end}
           style={styles.headerGradient}
         >
-          <View style={[styles.headerContent, { paddingTop: insets.top + Spacing.md }]}>
-            <Pressable onPress={() => router.back()} style={styles.backButton}>
-              <ArrowLeft size={24} color="#FFFFFF" />
-            </Pressable>
+          <View style={[styles.headerContent, { paddingTop: insets.top + Spacing.xl }]}>
             <View style={styles.logoContainer}>
               <Text style={styles.logoText}>Trailblazer+</Text>
               <Text style={styles.tagline}>Your outdoor adventure companion</Text>
@@ -114,6 +178,12 @@ export default function LoginScreen() {
               </View>
             </View>
 
+            {error && (
+              <View style={[styles.errorContainer, { backgroundColor: colors.danger + "15" }]}>
+                <Text style={[styles.errorText, { color: colors.danger }]}>{error}</Text>
+              </View>
+            )}
+
             {mode === "login" && (
               <Pressable style={styles.forgotPassword}>
                 <Text style={[styles.forgotPasswordText, { color: colors.primary }]}>
@@ -122,33 +192,16 @@ export default function LoginScreen() {
               </Pressable>
             )}
 
-            <Button onPress={handleAuth} style={styles.submitButton}>
-              {mode === "login" ? "Sign In" : "Create Account"}
+            <Button onPress={handleAuth} isDisabled={loading} style={styles.submitButton}>
+              {loading ? (
+                <ActivityIndicator size="small" color="#000" />
+              ) : mode === "login" ? (
+                "Sign In"
+              ) : (
+                "Create Account"
+              )}
             </Button>
 
-            <View style={styles.divider}>
-              <View style={[styles.dividerLine, { backgroundColor: colors.cardBorder }]} />
-              <Text style={[styles.dividerText, { color: colors.textSecondary }]}>or</Text>
-              <View style={[styles.dividerLine, { backgroundColor: colors.cardBorder }]} />
-            </View>
-
-            <Pressable
-              style={[styles.socialButton, { borderColor: colors.cardBorder }]}
-              onPress={() => {}}
-            >
-              <Text style={[styles.socialButtonText, { color: colors.textPrimary }]}>
-                Continue with Google
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={[styles.socialButton, { borderColor: colors.cardBorder }]}
-              onPress={() => {}}
-            >
-              <Text style={[styles.socialButtonText, { color: colors.textPrimary }]}>
-                Continue with Apple
-              </Text>
-            </Pressable>
           </View>
 
           <View style={styles.toggleContainer}>
@@ -177,10 +230,6 @@ const styles = StyleSheet.create({
   headerContent: {
     flex: 1,
     paddingHorizontal: Spacing.xl,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
     justifyContent: "center",
   },
   logoContainer: {
@@ -221,6 +270,15 @@ const styles = StyleSheet.create({
   inputGroup: {
     gap: Spacing.md,
   },
+  errorContainer: {
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginTop: Spacing.md,
+  },
+  errorText: {
+    fontSize: 14,
+    textAlign: "center",
+  },
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
@@ -251,30 +309,6 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     marginTop: Spacing.xl,
-  },
-  divider: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: Spacing.xl,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-  },
-  dividerText: {
-    paddingHorizontal: Spacing.md,
-    fontSize: 14,
-  },
-  socialButton: {
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    alignItems: "center",
-    marginBottom: Spacing.md,
-  },
-  socialButtonText: {
-    fontSize: 15,
-    fontWeight: "500",
   },
   toggleContainer: {
     flexDirection: "row",

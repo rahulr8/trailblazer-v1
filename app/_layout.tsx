@@ -1,4 +1,5 @@
-import { StyleSheet } from "react-native";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
 
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -9,6 +10,8 @@ import {
   ThemeProvider as NavigationThemeProvider,
 } from "@react-navigation/native";
 
+import { onAuthStateChanged, User } from "firebase/auth";
+
 import { HeroUINativeProvider } from "heroui-native";
 
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
@@ -16,6 +19,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 
 import { ThemeProvider, useTheme } from "@/contexts/theme-context";
+import { auth } from "@/lib/firebase";
 
 import "../global.css";
 
@@ -24,8 +28,42 @@ export const unstable_settings = {
 };
 
 function RootLayoutNav() {
-  const { isDark } = useTheme();
+  const { isDark, colors } = useTheme();
+  const [user, setUser] = useState<User | null | undefined>(undefined);
 
+  useEffect(() => {
+    console.log("[Layout] Setting up auth listener");
+    return onAuthStateChanged(auth, (user) => {
+      console.log("[Layout] Auth state changed:", user ? user.uid : "null");
+      setUser(user);
+    });
+  }, []);
+
+  // Loading state while checking auth
+  if (user === undefined) {
+    console.log("[Layout] Rendering: Loading...");
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  // Not authenticated - show login only
+  if (user === null) {
+    console.log("[Layout] Rendering: Login screen (not authenticated)");
+    return (
+      <NavigationThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="login" />
+        </Stack>
+        <StatusBar style="auto" />
+      </NavigationThemeProvider>
+    );
+  }
+
+  // Authenticated - show main app
+  console.log("[Layout] Rendering: Main app (authenticated as", user.uid, ")");
   return (
     <NavigationThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
       <Stack screenOptions={{ headerShown: false }}>
@@ -42,12 +80,6 @@ function RootLayoutNav() {
           options={{
             presentation: "fullScreenModal",
             animation: "slide_from_bottom",
-          }}
-        />
-        <Stack.Screen
-          name="login"
-          options={{
-            presentation: "fullScreenModal",
           }}
         />
       </Stack>
@@ -72,4 +104,9 @@ export default function RootLayout() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
 });

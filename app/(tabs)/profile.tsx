@@ -1,16 +1,39 @@
-import { Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 
+import { onAuthStateChanged, signOut } from "firebase/auth";
 import { router } from "expo-router";
 
-import { Award, ChevronRight, Moon, Settings, User } from "lucide-react-native";
+import { Award, ChevronRight, Link2, LogOut, Moon, Settings, User } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { BorderRadius, Spacing } from "@/constants";
 import { useTheme } from "@/contexts/theme-context";
+import { auth } from "@/lib/firebase";
+import { useStravaConnection } from "@/lib/strava";
 
 export default function ProfileScreen() {
   const { colors, shadows, isDark, toggleColorScheme } = useTheme();
   const insets = useSafeAreaInsets();
+  const [uid, setUid] = useState<string | null>(null);
+
+  useEffect(() => {
+    return onAuthStateChanged(auth, (user) => {
+      setUid(user?.uid ?? null);
+    });
+  }, []);
+
+  const strava = useStravaConnection(uid);
+
+  const handleSignOut = async () => {
+    try {
+      console.log("[Profile] Signing out...");
+      await signOut(auth);
+      console.log("[Profile] Sign out successful");
+    } catch (error) {
+      console.error("[Profile] Sign out error:", error);
+    }
+  };
 
   const stats = [
     { label: "Total KM", value: "156.4" },
@@ -77,6 +100,38 @@ export default function ProfileScreen() {
 
           <View style={[styles.divider, { backgroundColor: colors.cardBorder }]} />
 
+          <Pressable
+            style={styles.menuItem}
+            onPress={strava.isConnected ? strava.disconnect : strava.connect}
+            disabled={strava.isLoading || strava.isSyncing}
+          >
+            <View style={[styles.menuIcon, { backgroundColor: "#FC4C02" + "20" }]}>
+              <Link2 size={20} color="#FC4C02" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.menuLabel, { color: colors.textPrimary }]}>
+                {strava.isConnected ? "Strava Connected" : "Connect Strava"}
+              </Text>
+              {strava.isConnected && strava.athleteUsername && (
+                <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                  @{strava.athleteUsername}
+                </Text>
+              )}
+              {strava.error && (
+                <Text style={{ fontSize: 12, color: colors.danger }}>{strava.error}</Text>
+              )}
+            </View>
+            {strava.isLoading || strava.isSyncing ? (
+              <ActivityIndicator size="small" color="#FC4C02" />
+            ) : (
+              <Text style={{ color: strava.isConnected ? colors.danger : colors.primary, fontWeight: "600" }}>
+                {strava.isConnected ? "Disconnect" : "Connect"}
+              </Text>
+            )}
+          </Pressable>
+
+          <View style={[styles.divider, { backgroundColor: colors.cardBorder }]} />
+
           <View style={styles.menuItem}>
             <View style={[styles.menuIcon, { backgroundColor: colors.purple + "20" }]}>
               <Moon size={20} color={colors.purple} />
@@ -98,6 +153,15 @@ export default function ProfileScreen() {
             </View>
             <Text style={[styles.menuLabel, { color: colors.textPrimary }]}>Settings</Text>
             <ChevronRight size={20} color={colors.textSecondary} />
+          </Pressable>
+
+          <View style={[styles.divider, { backgroundColor: colors.cardBorder }]} />
+
+          <Pressable style={styles.menuItem} onPress={handleSignOut}>
+            <View style={[styles.menuIcon, { backgroundColor: colors.danger + "20" }]}>
+              <LogOut size={20} color={colors.danger} />
+            </View>
+            <Text style={[styles.menuLabel, { color: colors.danger }]}>Sign Out</Text>
           </Pressable>
         </View>
 
