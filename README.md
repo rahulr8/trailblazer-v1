@@ -101,9 +101,12 @@ npm run firebase:deploy # Build and deploy Cloud Functions
 
 ## Documentation
 
-See `CLAUDE.md` files throughout the codebase for detailed documentation:
+### Guides
+- `/docs/strava-integration.md` - Complete Strava OAuth and sync flow
+
+### Code Reference (CLAUDE.md files)
 - `/CLAUDE.md` - Project overview and code standards
-- `/lib/strava/CLAUDE.md` - Strava integration
+- `/lib/strava/CLAUDE.md` - Strava client module
 - `/lib/db/CLAUDE.md` - Database operations
 - `/functions/CLAUDE.md` - Cloud Functions
 
