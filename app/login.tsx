@@ -3,7 +3,7 @@ import { useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { LinearGradient } from "expo-linear-gradient";
-import { Stack } from "expo-router";
+import { router, Stack } from "expo-router";
 
 import {
   createUserWithEmailAndPassword,
@@ -83,6 +83,7 @@ export default function LoginScreen() {
         await signInWithEmailAndPassword(auth, email.trim(), password);
         console.log("[Auth] Sign in successful");
       }
+      router.replace("/(tabs)");
     } catch (err) {
       console.error("[Auth] Error:", err);
       if (err && typeof err === "object" && "code" in err) {

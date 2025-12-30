@@ -1,13 +1,13 @@
-import { useEffect, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { signOut } from "firebase/auth";
 import { router } from "expo-router";
 
 import { Award, ChevronRight, Link2, LogOut, Moon, Settings, User } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { BorderRadius, Spacing } from "@/constants";
+import { useAuth } from "@/contexts/auth-context";
 import { useTheme } from "@/contexts/theme-context";
 import { auth } from "@/lib/firebase";
 import { useStravaConnection } from "@/lib/strava";
@@ -15,14 +15,7 @@ import { useStravaConnection } from "@/lib/strava";
 export default function ProfileScreen() {
   const { colors, shadows, isDark, toggleColorScheme } = useTheme();
   const insets = useSafeAreaInsets();
-  const [uid, setUid] = useState<string | null>(null);
-
-  useEffect(() => {
-    return onAuthStateChanged(auth, (user) => {
-      setUid(user?.uid ?? null);
-    });
-  }, []);
-
+  const { uid } = useAuth();
   const strava = useStravaConnection(uid);
 
   const handleSignOut = async () => {
@@ -30,6 +23,7 @@ export default function ProfileScreen() {
       console.log("[Profile] Signing out...");
       await signOut(auth);
       console.log("[Profile] Sign out successful");
+      router.replace("/login");
     } catch (error) {
       console.error("[Profile] Sign out error:", error);
     }

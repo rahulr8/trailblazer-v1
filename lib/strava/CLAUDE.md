@@ -6,44 +6,57 @@ React Native / Expo client-side Strava OAuth integration.
 
 ```
 lib/strava/
-├── index.ts    # Re-exports all modules
-├── config.ts   # OAuth endpoints and configuration
-├── auth.ts     # expo-auth-session hook for OAuth flow
+├── index.ts    # Exports useStravaConnection
+├── config.ts   # OAuth configuration constants
 └── hooks.ts    # useStravaConnection hook for UI
+```
+
+Also:
+```
+contexts/
+└── strava-context.tsx  # StravaProvider with OAuth logic
 ```
 
 ## Dependencies
 
 ```bash
-npx expo install expo-auth-session expo-crypto expo-secure-store expo-web-browser
+npx expo install expo-web-browser expo-linking
 ```
 
 ## Configuration
 
-OAuth is configured in `config.ts`:
-- Client ID from `EXPO_PUBLIC_STRAVA_CLIENT_ID` env var
-- Mobile OAuth endpoint: `https://www.strava.com/oauth/mobile/authorize`
-- Scopes: `["activity:read"]`
-- Redirect path: `strava-callback`
+`config.ts` exports:
+- `STRAVA_CLIENT_ID` - from `EXPO_PUBLIC_STRAVA_CLIENT_ID` env var
+- `STRAVA_AUTH_ENDPOINT` - `https://www.strava.com/oauth/authorize`
+- `STRAVA_SCOPES` - `["activity:read"]`
+- `STRAVA_REDIRECT_PATH` - `trailblazerplus`
 
 **Important**: The app scheme must be `trailblazerplus` (set in `app.json`).
 
 ## OAuth Flow
 
-1. User taps "Connect Strava"
-2. `useStravaAuth()` opens Strava's mobile OAuth page
+1. User taps "Connect Strava" → `useStravaConnection.connect()` calls `initiateOAuth()`
+2. `StravaProvider` opens OAuth browser via `WebBrowser.openAuthSessionAsync()`
 3. User authorizes in Strava app or mobile web
-4. Strava redirects back with authorization code
-5. App sends code to Cloud Function `stravaTokenExchange`
-6. Cloud Function exchanges code for tokens, stores encrypted in Firestore
-7. Initial sync fetches last 30 days of activities
+4. Browser returns with authorization code directly as promise result
+5. `StravaProvider` exchanges code via Cloud Function `stravaTokenExchange`
+6. Cloud Function stores encrypted tokens in Firestore
+7. `useStravaConnection` Firestore listener picks up the new connection status
 
-## Hooks
+## Architecture
 
-### useStravaAuth()
-Low-level hook wrapping `expo-auth-session`:
-```typescript
-const { request, response, promptAsync, isReady } = useStravaAuth();
+OAuth is handled by `StravaProvider` (in `contexts/strava-context.tsx`):
+- Uses `WebBrowser.openAuthSessionAsync()` which returns the redirect URL directly
+- No need for deep link listeners or expo-auth-session
+- Always mounted at root level via `_layout.tsx`
+
+```tsx
+// app/_layout.tsx
+<AuthProvider>
+  <StravaProvider>  {/* OAuth logic here */}
+    <RootLayoutNav />
+  </StravaProvider>
+</AuthProvider>
 ```
 
 ### useStravaConnection(uid)
@@ -52,13 +65,14 @@ High-level hook for UI integration:
 const {
   isConnected,      // boolean - has active Strava connection
   isLoading,        // boolean - loading state
-  isSyncing,        // boolean - syncing activities
+  isSyncing,        // boolean - syncing activities or connecting
   athleteId,        // number | null
   athleteUsername,  // string | null
   lastSyncAt,       // Date | null
   error,            // string | null
   connect,          // () => Promise<void> - start OAuth flow
   disconnect,       // () => Promise<void> - revoke and remove
+  sync,             // () => Promise<number> - sync activities
 } = useStravaConnection(uid);
 ```
 
@@ -69,12 +83,12 @@ import { useStravaConnection } from '@/lib/strava';
 
 function SettingsScreen() {
   const { uid } = useAuth();
-  const { isConnected, connect, disconnect, isLoading } = useStravaConnection(uid);
+  const { isConnected, connect, disconnect, isLoading, isSyncing } = useStravaConnection(uid);
 
   return (
     <Button
       onPress={isConnected ? disconnect : connect}
-      disabled={isLoading}
+      disabled={isLoading || isSyncing}
     >
       {isConnected ? 'Disconnect Strava' : 'Connect Strava'}
     </Button>
@@ -89,6 +103,6 @@ The OAuth code is exchanged for tokens via the `stravaTokenExchange` Cloud Funct
 ## Error Handling
 
 The hook captures errors in the `error` state. Common errors:
-- "Auth not ready" - OAuth request not initialized
-- "User must be authenticated" - No Firebase auth
+- "Must be logged in" - No Firebase auth
+- "No code in redirect URL" - OAuth redirect failed
 - Token exchange failures from Strava API

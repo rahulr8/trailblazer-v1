@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 
 import { Stack } from "expo-router";
@@ -10,16 +9,15 @@ import {
   ThemeProvider as NavigationThemeProvider,
 } from "@react-navigation/native";
 
-import { onAuthStateChanged, User } from "firebase/auth";
-
 import { HeroUINativeProvider } from "heroui-native";
 
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 
+import { AuthProvider, useAuth } from "@/contexts/auth-context";
+import { StravaProvider } from "@/contexts/strava-context";
 import { ThemeProvider, useTheme } from "@/contexts/theme-context";
-import { auth } from "@/lib/firebase";
 
 import "../global.css";
 
@@ -29,19 +27,9 @@ export const unstable_settings = {
 
 function RootLayoutNav() {
   const { isDark, colors } = useTheme();
-  const [user, setUser] = useState<User | null | undefined>(undefined);
+  const { user, isLoading } = useAuth();
 
-  useEffect(() => {
-    console.log("[Layout] Setting up auth listener");
-    return onAuthStateChanged(auth, (user) => {
-      console.log("[Layout] Auth state changed:", user ? user.uid : "null");
-      setUser(user);
-    });
-  }, []);
-
-  // Loading state while checking auth
-  if (user === undefined) {
-    console.log("[Layout] Rendering: Loading...");
+  if (isLoading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -49,9 +37,7 @@ function RootLayoutNav() {
     );
   }
 
-  // Not authenticated - show login only
-  if (user === null) {
-    console.log("[Layout] Rendering: Login screen (not authenticated)");
+  if (!user) {
     return (
       <NavigationThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
         <Stack screenOptions={{ headerShown: false }}>
@@ -62,8 +48,6 @@ function RootLayoutNav() {
     );
   }
 
-  // Authenticated - show main app
-  console.log("[Layout] Rendering: Main app (authenticated as", user.uid, ")");
   return (
     <NavigationThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
       <Stack screenOptions={{ headerShown: false }}>
@@ -93,9 +77,13 @@ export default function RootLayout() {
     <GestureHandlerRootView style={styles.root}>
       <HeroUINativeProvider>
         <ThemeProvider>
-          <BottomSheetModalProvider>
-            <RootLayoutNav />
-          </BottomSheetModalProvider>
+          <AuthProvider>
+            <StravaProvider>
+              <BottomSheetModalProvider>
+                <RootLayoutNav />
+              </BottomSheetModalProvider>
+            </StravaProvider>
+          </AuthProvider>
         </ThemeProvider>
       </HeroUINativeProvider>
     </GestureHandlerRootView>

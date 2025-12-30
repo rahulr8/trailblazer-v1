@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { onAuthStateChanged } from "firebase/auth";
 import { router } from "expo-router";
 
 import { Button } from "heroui-native";
@@ -10,8 +9,8 @@ import { Activity as ActivityIcon, Plus, RefreshCw } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { BorderRadius, Spacing } from "@/constants";
+import { useAuth } from "@/contexts/auth-context";
 import { useTheme } from "@/contexts/theme-context";
-import { auth } from "@/lib/firebase";
 import { getUserStats } from "@/lib/db/users";
 import { getRecentActivities } from "@/lib/db/activities";
 import { Activity, UserStats } from "@/lib/db/types";
@@ -39,17 +38,11 @@ function formatDuration(minutes: number): string {
 export default function HomeScreen() {
   const { colors, shadows } = useTheme();
   const insets = useSafeAreaInsets();
-  const [uid, setUid] = useState<string | null>(null);
+  const { uid } = useAuth();
   const [stats, setStats] = useState<UserStats | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const strava = useStravaConnection(uid);
-
-  useEffect(() => {
-    return onAuthStateChanged(auth, (user) => {
-      setUid(user?.uid ?? null);
-    });
-  }, []);
 
   const fetchData = async () => {
     if (!uid) return;

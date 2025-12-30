@@ -60,6 +60,16 @@ lib/                    # Utilities and data
 - Keep navigation state in URLs, app state in contexts
 - Colocate related code: component + types + utils in same directory
 
+### Expo Router Auth Navigation
+
+Expo Router maintains navigation state separately from conditional Stack rendering. Changing which screens are defined in `_layout.tsx` based on auth state does NOT automatically navigate the user.
+
+**Always use explicit navigation after auth changes:**
+- After sign in: `router.replace("/(tabs)")`
+- After sign out: `router.replace("/login")`
+
+Use `replace` (not `push`) to prevent back-navigation to invalid screens.
+
 ## Provider Hierarchy
 
 Order matters - outermost to innermost:

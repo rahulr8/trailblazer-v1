@@ -2,8 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { httpsCallable, getFunctions } from "firebase/functions";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { useStravaAuth, getAuthorizationCode } from "./auth";
-import { STRAVA_SCOPES } from "./config";
+import { useStrava } from "@/contexts/strava-context";
 import { StravaConnection } from "@/lib/db/types";
 
 interface StravaConnectionState {
@@ -33,8 +32,9 @@ export function useStravaConnection(uid: string | null): UseStravaConnectionRetu
     error: null,
   });
 
-  const { response, promptAsync, isReady } = useStravaAuth();
+  const { initiateOAuth, isConnecting, error: oauthError } = useStrava();
 
+  // Listen to Firestore for connection status
   useEffect(() => {
     if (!uid) {
       setState((prev) => ({ ...prev, isLoading: false }));
@@ -70,69 +70,11 @@ export function useStravaConnection(uid: string | null): UseStravaConnectionRetu
     return () => unsubscribe();
   }, [uid]);
 
-  useEffect(() => {
-    console.log("[Strava Hook] Response effect triggered, type:", response?.type);
-    const code = getAuthorizationCode(response);
-    console.log("[Strava Hook] Code extracted:", !!code, "uid:", !!uid);
-
-    if (code && uid) {
-      console.log("[Strava Hook] Starting token exchange...");
-      exchangeToken(uid, code);
-    } else if (response?.type === "error") {
-      const errorMsg =
-        (response.params as Record<string, string>)?.error_description || "Authorization failed";
-      setState((prev) => ({ ...prev, error: errorMsg }));
-    }
-  }, [response, uid]);
-
-  const exchangeToken = async (userId: string, code: string) => {
-    console.log("[Strava Hook] Exchanging token for user:", userId);
-    setState((prev) => ({ ...prev, isSyncing: true, error: null }));
-
-    try {
-      const functions = getFunctions();
-      const stravaTokenExchange = httpsCallable<
-        { code: string; scopes: string[] },
-        { success: boolean; athleteId: number; athleteName: string }
-      >(functions, "stravaTokenExchange");
-
-      console.log("[Strava Hook] Calling Cloud Function stravaTokenExchange...");
-      const result = await stravaTokenExchange({ code, scopes: STRAVA_SCOPES });
-      console.log("[Strava Hook] Token exchange successful:", result.data);
-    } catch (error) {
-      console.error("[Strava Hook] Token exchange failed:", error);
-      let errorMessage = "Failed to connect Strava";
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      setState((prev) => ({ ...prev, error: errorMessage }));
-    } finally {
-      setState((prev) => ({ ...prev, isSyncing: false }));
-    }
-  };
-
+  // Connect via context - handles OAuth flow
   const connect = useCallback(async () => {
-    console.log("[Strava Hook] Connect called, isReady:", isReady);
-    if (!isReady) {
-      console.warn("[Strava Hook] Auth not ready yet");
-      setState((prev) => ({ ...prev, error: "Auth not ready" }));
-      return;
-    }
-
     setState((prev) => ({ ...prev, error: null }));
-
-    try {
-      console.log("[Strava Hook] Opening OAuth prompt...");
-      await promptAsync();
-      console.log("[Strava Hook] OAuth prompt completed");
-    } catch (error) {
-      console.error("[Strava Hook] Auth prompt error:", error);
-      setState((prev) => ({
-        ...prev,
-        error: error instanceof Error ? error.message : "Failed to open Strava",
-      }));
-    }
-  }, [isReady, promptAsync]);
+    await initiateOAuth();
+  }, [initiateOAuth]);
 
   const disconnect = useCallback(async () => {
     if (!uid) return;
@@ -186,6 +128,8 @@ export function useStravaConnection(uid: string | null): UseStravaConnectionRetu
 
   return {
     ...state,
+    isSyncing: state.isSyncing || isConnecting,
+    error: state.error || oauthError,
     connect,
     disconnect,
     sync,
